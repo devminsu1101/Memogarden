@@ -1,18 +1,21 @@
+// src/app/api/save/route.ts 수정
+
 import { savePostToGithub } from "@/lib/github";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-  const { title, content } = await request.json();
+  const { title, content, category } = await request.json();
 
-  if (!title || !content) {
-    return NextResponse.json({ error: "제목과 내용을 입력해주세요." }, { status: 400 });
+  if (!title || !content || !category) {
+    return NextResponse.json({ error: "모든 항목을 입력해주세요." }, { status: 400 });
   }
 
-  const result = await savePostToGithub(title, content);
+  // category 인자 추가
+  const result = await savePostToGithub(title, content, category);
 
   if (result.success) {
-    return NextResponse.json({ message: "성공적으로 저장되었습니다!" });
+    return NextResponse.json({ message: "성공!" });
   } else {
-    return NextResponse.json({ error: "저장 실패" }, { status: 500 });
+    return NextResponse.json({ error: "실패" }, { status: 500 });
   }
 }

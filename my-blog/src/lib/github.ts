@@ -15,39 +15,74 @@ if (!owner || !repo) {
 /**
  * 깃허브에 마크다운 파일을 생성하거나 수정하는 함수
  */
-export async function savePostToGithub(title: string, content: string) {
-  // 제목에서 공백을 '-'로 바꾸고 소문자로 변환하여 파일명 생성
+// src/lib/github.ts 수정
+
+export async function savePostToGithub(title: string, content: string, category: string) {
+  // 카테고리명을 폴더명으로 변환 (소문자, 공백은 '-')
+  const folderName = category.replace(/\s+/g, "-").toLowerCase();
   const fileName = `${title.replace(/\s+/g, "-").toLowerCase()}.md`;
-  const path = `content/${fileName}`; // 레포지토리 내 content 폴더에 저장
+  
+  // 경로를 content/카테고리명/파일명.md 로 설정
+  const path = `content/${folderName}/${fileName}`; 
 
   try {
     let sha: string | undefined;
 
-    // 1. 기존에 같은 이름의 파일이 있는지 확인 (수정 시 필요)
     try {
-      const { data }: any = await octokit.repos.getContent({
-        owner,
-        repo,
-        path,
-      });
-      sha = data.sha; // 파일이 존재하면 고유한 ID(sha)를 가져옵니다.
+      const { data }: any = await octokit.repos.getContent({ owner, repo, path });
+      sha = data.sha;
     } catch (e) {
-      // 파일이 없으면 sha 없이 진행 (신규 생성)
+      // 신규 파일
     }
 
-    // 2. 깃허브로 파일 전송 (커밋!)
     const response = await octokit.repos.createOrUpdateFileContents({
       owner,
       repo,
       path,
-      message: `📝 Memogarden: ${title} 기록`,
-      content: Buffer.from(content).toString("base64"), // 내용은 base64로 인코딩 필수
-      sha, // 기존 파일이 있을 때만 포함됨
+      message: `📝 [${category}] ${title} 기록`,
+      content: Buffer.from(content).toString("base64"),
+      sha,
     });
 
     return { success: true, data: response.data };
   } catch (error) {
     console.error("GitHub API Error:", error);
     return { success: false, error };
+  }
+}
+
+/**
+ * 특정 카테고리(폴더) 내의 파일 목록을 가져오는 함수
+ */
+export async function getPostList(category: string) {
+  // 카테고리를 폴더명 형식으로 변환
+  const folderName = category.replace(/\s+/g, "-").toLowerCase();
+  const path = `content/${folderName}`;
+
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path,
+    });
+
+    if (Array.isArray(data)) {
+      // .md 파일만 필터링하고 이름에서 .md 확장자 제거
+      return data
+        .filter((file) => file.name.endsWith(".md"))
+        .map((file) => ({
+          title: file.name.replace(".md", "").replace(/-/g, " "),
+          fileName: file.name,
+          path: file.path,
+        }));
+    }
+    return [];
+  } catch (error : any) {
+    // 폴더가 없는 카테고리라 나오는 404 에러 
+    if (error.status === 404) {
+      return [] 
+    }
+    console.error("목록 가져오기 실패:", error);
+    return [];
   }
 }
